@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #ff8fa3;
+  --primary-light: #ffb3c1;
+  --secondary: #c2eaba;
+  --accent: #ffccd5;
+  --bg: #fff5f7;
+  --text: #4a4e69;
+  --glass: rgba(255, 255, 255, 0.7);
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #fff5f7 0%, #ffeef2 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(255, 143, 163, 0.1);
+  border-radius: 24px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff8fa3 0%, #ff758f 100%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 143, 163, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 143, 163, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.input-field {
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid #ffccd5;
+  border-radius: 16px;
+  padding: 12px 16px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.input-field:focus {
+  border-color: #ff8fa3;
+  box-shadow: 0 0 0 4px rgba(255, 143, 163, 0.1);
+}
+
+.sweet-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sweet-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sweet-scrollbar::-webkit-scrollbar-thumb {
+  background: #ffccd5;
+  border-radius: 10px;
+}
+
+.working-pulsate {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 143, 163, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(255, 143, 163, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 143, 163, 0); }
+}

@@ -2,42 +2,40 @@
 
 Bu proje, iki kişinin eş zamanlı olarak ders çalışmasını, birbirlerinin ilerlemesini takip etmesini ve ortak bir çalışma alanı oluşturmasını sağlayan profesyonel bir web uygulamasıdır. 
 
-Uygulama, modern web standartları (React, Node.js, PostgreSQL) ve Docker altyapısı ile sunucu tarafında %100 stabilite hedefleyerek inşa edilmiştir.
+Uygulama, modern web standartları (React, Node.js, PostgreSQL) ve Docker altyapısı ile %100 stabilite hedefleyerek inşa edilmiştir.
 
 ## 🚀 Projenin Amacı ve İşlevleri
 Uygulama, sadece bir kronometre olmanın ötesinde, iki kullanıcı arasında tam bir senkronizasyon ve motivasyon kanalı oluşturur.
 
 ### Temel Özellikler:
-- **Canlı Ders Takibi:** 2 kullanıcı için milisaniyelik hassasiyetle senkronize kronometreler.
-- **Mola Sistemi:** Bir kişi mola aldığında diğerinin ekranında durumun anlık olarak yansıması.
-- **Paylaşımlı Todo Listesi:** Seans boyunca bitirilmesi gereken görevlerin ortak takibi.
-- **Dahili Sohbet (Chat):** Çalışma sırasında motivasyonel mesajlaşma alanı.
-- **Giriş ve Güvenlik:** İsim ve dinamik avatar seçimi ile oda şifreleme.
-- **Veri Kalıcılığı:** Sunucu resetlense bile PostgreSQL üzerinde saklanan veriler sayesinde seans kaldığı yerden devam eder.
+- **Canlı Ders Takibi:** Gerçek zamanlı senkronize kronometreler.
+- **Mola Sistemi:** Anlık durum güncellemeleri.
+- **Paylaşımlı Todo Listesi:** Ortak görev yönetimi.
+- **Dahili Sohbet (Chat):** Motivasyonel mesajlaşma alanı.
+- **Responsive Tasarım:** Mobil, tablet ve masaüstü uyumlu premium arayüz.
+- **Veri Kalıcılığı:** PostgreSQL ile kalıcı oturum yönetimi.
 
 ## 🛠 Teknik Mimari
-Proje, kurumsal seviyede bir "Monorepo" yapısına sahiptir:
+- **Frontend:** React (Vite) + Tailwind CSS + Framer Motion.
+- **Backend:** Node.js + Express + Socket.io + Prisma.
+- **Database:** PostgreSQL.
+- **Altyapı:** Docker & Docker Compose.
 
-- **Frontend:** React (Vite) + Tailwind CSS + Framer Motion (Animasyonlar).
-- **Backend:** Node.js + Express + Socket.io.
-- **Database:** PostgreSQL (Veri kalıcılığı ve performans için).
-- **Altyapı:** Docker & Docker Compose (Saniyeler içinde yayınlama kolaylığı).
-
-## 🐳 Docker ile Kurulum (Canlı Yayın)
-Projenin kendi sunucunuzda (VPS) çalışması için Docker kurulu olması yeterlidir.
+## 🐳 Docker ile Kurulum
+Sistemi saniyeler içinde ayağa kaldırmak için:
 
 1.  **Dizine gidin:** `cd study-buddies`
 2.  **Sistemi Ayağa Kaldırın:**
     ```bash
-    docker-compose up -d
+    make docker-up
     ```
-3.  **Bitti!** Uygulamanız otomatik olarak veritabanını kuracak ve yayına başlayacaktır.
+3.  **Bitti!** Uygulamanıza `http://localhost:8080` adresinden erişebilirsiniz.
 
-## 📁 Dosya Yapısı ve Görevleri
-- `/frontend`: Kullanıcı arayüzü ve Socket.io istemci mantığı.
-- `/backend`: Sunucu tarafı etkinlik yönetimi ve API'ler.
-- `/prisma`: Veritabanı şeması ve migration dosyaları.
-- `docker-compose.yml`: Frontend, Backend ve DB arasındaki orkestrasyon.
+## 📁 Dosya Yapısı
+- `/frontend`: React kullanıcı arayüzü.
+- `/backend`: API ve Socket.io sunucusu.
+- `/backend/prisma`: Veritabanı şeması.
+- `docker-compose.yml`: Sistem orkestrasyonu.
 
 ---
-*Bu proje Muhammed İkbal AKGÜNDOĞDU için yüksek performanslı ve "Sweet" temalı bir ders çalışma ortamı sağlamak amacıyla geliştirilmektedir.*
+*Bu proje Muhammed İkbal AKGÜNDOĞDU için yüksek performanslı ve "Sweet" temalı bir ders çalışma ortamı sağlamak amacıyla modernize edilmiştir.*
