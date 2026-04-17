@@ -15,7 +15,10 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
   const userRef = useRef(user);
-  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { 
+    userRef.current = user; 
+    if (user) localStorage.setItem('study_user', JSON.stringify(user));
+  }, [user]);
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [todos, setTodos] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -98,7 +101,13 @@ function App() {
       }
     };
 
+    const onUserStateSync = (syncedUser) => {
+      setUser(syncedUser);
+      localStorage.setItem('study_user', JSON.stringify(syncedUser));
+    };
+
     socket.on('connect', onConnect);
+    socket.on('user-state-sync', onUserStateSync);
     socket.on('user-joined', onUserJoined);
     socket.on('all-users', onAllUsers);
     socket.on('initial-data', onInitialData);
@@ -116,6 +125,7 @@ function App() {
 
     return () => {
       socket.off('connect', onConnect);
+      socket.off('user-state-sync', onUserStateSync);
       socket.off('user-joined', onUserJoined);
       socket.off('all-users', onAllUsers);
       socket.off('initial-data', onInitialData);
@@ -150,14 +160,24 @@ function App() {
     setIsJoined(true);
   };
 
-  // Heartbeat to keep session alive
+  // Heartbeat & Sync to keep session alive
   useEffect(() => {
     if (!socket || !isJoined || !user) return;
-    const heartbeat = setInterval(() => {
-        socket.emit('update-state', user);
-    }, 30000);
-    return () => clearInterval(heartbeat);
-  }, [socket, isJoined, user]);
+    const interval = setInterval(() => {
+        const updatedUser = { ...userRef.current };
+        
+        // If timer is active, sync elapsed time to DB
+        if (updatedUser.isActive && updatedUser.startTime) {
+            const elapsed = Math.floor((Date.now() - new Date(updatedUser.startTime).getTime()) / 1000);
+            updatedUser.totalSeconds += elapsed;
+            updatedUser.startTime = new Date().getTime(); // Reset startTime to now to avoid double counting next time
+            setUser(updatedUser);
+        }
+        
+        socket.emit('update-state', updatedUser);
+    }, 10000); // More frequent sync (10s)
+    return () => clearInterval(interval);
+  }, [socket, isJoined]);
 
   const toggleTimer = () => {
     const updatedUser = { ...user, isActive: !user.isActive };

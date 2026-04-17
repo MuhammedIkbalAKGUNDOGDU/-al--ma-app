@@ -51,6 +51,9 @@ io.on('connection', (socket) => {
       socket.join(room);
       socket.to(room).emit('user-joined', user);
       
+      // Send user state back to them for persistence on refresh
+      socket.emit('user-state-sync', user);
+      
       const dbUsers = await prisma.user.findMany({
         where: {
           roomId: room,
