@@ -1,5 +1,6 @@
 // --- KONFİGÜRASYON ---
-const SERVER_URL = "http://localhost:3000";
+// Canlıya alındığında otomatik olarak mevcut adrese bağlanır
+const SERVER_URL = window.location.origin;
 const socket = io(SERVER_URL);
 
 // --- STATE ---
