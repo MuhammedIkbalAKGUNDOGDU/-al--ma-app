@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyBuddies - Birlikte Çalışalım!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Socket.io İstemci Kütüphanesi -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Giriş Ekranı -->
+    <div id="login-screen" class="screen active">
+        <div class="glass-card login-card">
+            <h1>🌸 StudyBuddies</h1>
+            <p>Beraber ders çalışmak için bir isim seç!</p>
+            <div class="input-group">
+                <input type="text" id="username-input" placeholder="Adın ne?" maxlength="15">
+            </div>
+            <div class="avatar-selector">
+                <p>Favori karakterini seç:</p>
+                <div class="avatar-grid" id="avatar-grid">
+                    <!-- JS ile dolacak -->
+                </div>
+            </div>
+            <button id="join-btn" class="primary-btn">Odaya Katıl ✨</button>
+        </div>
+    </div>
+
+    <!-- Çalışma Ekranı -->
+    <div id="study-screen" class="screen">
+        <header>
+            <div class="room-info">
+                <span id="room-display">Canlı Ders Odası</span>
+            </div>
+            <div class="logo">StudyBuddies 📚</div>
+            <button id="leave-btn" class="text-btn">Ayrıl</button>
+        </header>
+
+        <main class="study-container">
+            <!-- Kullanıcı 1 (Ben/Yerel) -->
+            <div class="user-card glass-card" id="local-user">
+                <div class="user-badge">Sen</div>
+                <div class="avatar-circle" id="local-avatar">
+                   <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=local" alt="avatar">
+                </div>
+                <h2 id="local-name">Yükleniyor...</h2>
+                <div class="status-tag working">Çalışıyor</div>
+                <div class="timer">
+                    <span id="local-timer">00:00:00</span>
+                    <div class="timer-mola-overlay">☕ MOLADA</div>
+                </div>
+                <div class="controls">
+                    <button id="timer-toggle" class="control-btn play">
+                        <i data-lucide="play"></i> Başla
+                    </button>
+                    <button id="break-toggle" class="control-btn tea">
+                        <i data-lucide="coffee"></i> Mola Al
+                    </button>
+                </div>
+            </div>
+
+            <div class="vs-divider">✨</div>
+
+            <!-- Kullanıcı 2 (Arkadaş/Uzak) -->
+            <div class="user-card glass-card empty" id="remote-user">
+                <div class="waiting-state">
+                    <div class="loader"></div>
+                    <p>Arkadaşın bekleniyor...</p>
+                    <small>Aynı linki açmasını söyle!</small>
+                </div>
+                <!-- Bu kısım JS ile dolacak -->
+                <div class="user-content hidden">
+                    <div class="user-badge">Buddy</div>
+                    <div class="avatar-circle" id="remote-avatar">
+                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=remote" alt="avatar">
+                    </div>
+                    <h2 id="remote-name">---</h2>
+                    <div class="status-tag working">Çalışıyor</div>
+                    <div class="timer">
+                        <span id="remote-timer">00:00:00</span>
+                        <div class="timer-mola-overlay">☕ MOLADA</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
