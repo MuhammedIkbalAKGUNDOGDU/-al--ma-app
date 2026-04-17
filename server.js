@@ -2,83 +2,58 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const fs = require('fs');
 const path = require('path');
 
 const app = express();
 app.use(cors());
 
-// Statik dosyaları sun (index.html, style.css, app.js)
-app.use(express.static(__dirname));
+// --- STABİL STATİK DOSYA SUNUMU ---
+// Dosyaların MIME tiplerini ve yollarını garanti altına alalım
+app.use(express.static(path.resolve(__dirname)));
 
-// Ana sayfayı gönder
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.resolve(__dirname, 'index.html'));
 });
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-const DATA_FILE = path.join(__dirname, 'data.json');
-
-// Veriyi yükle veya boş başlat
+// --- STATE (BELLEKTE TUTULUR, HIZLI VE STABİL) ---
 let userData = {};
-if (fs.existsSync(DATA_FILE)) {
-    try {
-        userData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    } catch (e) {
-        console.error("Veri okuma hatası:", e);
-        userData = {};
-    }
-}
-
-// Veriyi kaydetme fonksiyonu
-const saveData = () => {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(userData, null, 2));
-};
-
-// Soket ID'lerini kullanıcı ID'leri ile eşleştir (Ayrılma takibi için)
 const socketToUser = {};
 
 io.on('connection', (socket) => {
-    console.log('Yeni kullanıcı bağlandı:', socket.id);
+    console.log('Bağlantı sağlandı:', socket.id);
 
-    // Kullanıcı odaya katıldığında
-    socket.on('join', (userDataFromClient) => {
-        const { id, name, avatarSeed } = userDataFromClient;
+    socket.on('join', (data) => {
+        if (!data || !data.id) return;
+
+        const { id, name, avatarSeed } = data;
         socketToUser[socket.id] = id;
 
-        // Her girişte süreleri ve durumu sıfırla (Kullanıcının isteği üzerine)
-        userData[id] = { 
-            ...userDataFromClient, 
-            totalSeconds: 0, 
-            isActive: false, 
-            status: 'working', 
-            startTime: null 
+        // Kullanıcıyı odaya kaydet (veya güncelle)
+        userData[id] = {
+            ...data,
+            totalSeconds: 0, // Her girişte sıfırla isteği üzerine
+            isActive: false,
+            status: 'working',
+            startTime: null
         };
-        
-        saveData();
-        
-        // Kullanıcıya sıfırlanmış durumunu bildir
-        socket.emit('init-state', userData[id]);
-        
-        // Yeni kullanıcıyı herkese duyur
+
+        console.log(`${name} odaya katıldı.`);
+
+        // Yeni kullanıcıyı duyur
         socket.broadcast.emit('user-joined', userData[id]);
         
-        // Mevcut diğer kullanıcıları yeni gelene gönder
+        // Mevcut kullanıcıları yeni gelene gönder
         socket.emit('all-users', Object.values(userData).filter(u => u.id !== id));
     });
 
-    // Durum güncellemesi
     socket.on('update-state', (data) => {
-        if (userData[data.id]) {
+        if (data && data.id && userData[data.id]) {
             userData[data.id] = { ...userData[data.id], ...data };
-            saveData();
             socket.broadcast.emit('state-changed', userData[data.id]);
         }
     });
@@ -89,12 +64,17 @@ io.on('connection', (socket) => {
             console.log(`Kullanıcı ayrıldı: ${userId}`);
             socket.broadcast.emit('user-left', userId);
             delete socketToUser[socket.id];
-            // Not: userData'dan silmiyoruz ki süresi kalsın
+            
+            // Eğer kimse kalmadıysa odayı tamamen sıfırla (Temizlik)
+            if (Object.keys(socketToUser).length === 0) {
+                console.log("Oda boşaldı, veriler temizleniyor...");
+                userData = {};
+            }
         }
     });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
+    console.log(`StudyBuddies Pro Sunucusu ${PORT} portunda hazır!`);
 });

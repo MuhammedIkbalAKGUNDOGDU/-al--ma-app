@@ -1,7 +1,10 @@
 // --- KONFİGÜRASYON ---
-// Canlıya alındığında otomatik olarak mevcut adrese bağlanır
 const SERVER_URL = window.location.origin;
-const socket = io(SERVER_URL);
+const socket = io(SERVER_URL, {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+});
 
 // --- STATE ---
 let currentUser = {
@@ -24,10 +27,6 @@ const screens = {
     study: document.getElementById('study-screen')
 };
 
-const inputs = {
-    username: document.getElementById('username-input')
-};
-
 const displays = {
     localName: document.getElementById('local-name'),
     localTimer: document.getElementById('local-timer'),
@@ -47,6 +46,8 @@ const buttons = {
 
 // --- INITIALIZATION ---
 function init() {
+    setupAvatarGrid();
+
     buttons.join.addEventListener('click', joinApp);
     buttons.timerToggle.addEventListener('click', toggleTimer);
     buttons.breakToggle.addEventListener('click', toggleBreak);
@@ -55,18 +56,33 @@ function init() {
         location.reload();
     });
 
-    inputs.username.addEventListener('keypress', (e) => {
+    document.getElementById('username-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') joinApp();
     });
 
-    // Avatar Grid Oluştur
+    // Otomatik giriş
+    if (currentUser.name) {
+        document.getElementById('username-input').value = currentUser.name;
+        // Opsiyonel: Direkt giriş yapılabilir veya kullanıcı tıklar.
+    }
+
+    setupSocket();
+    startTimerLoop();
+    
+    // Lucide ikonlarını ilk başta ve her güncellemede bas
+    if (window.lucide) lucide.createIcons();
+}
+
+function setupAvatarGrid() {
     const seeds = [
         "Mimi", "Jasper", "Sheba", "Coco", "Luna", "Leo", "Buster", "Cleo",
         "Felix", "Willow", "Oliver", "Pepper", "Ziggy", "Sasha", "Toby", "Bella",
-        "Cookie", "Nala", "Milo", "Daisy", "Rocky", "Ruby", "Shadow", "Sophie",
-        "Lucky", "Chloe", "Teddy", "Gracie", "Jack", "Zoe", "Murphy", "Lily"
+        "Cookie", "Nala", "Milo", "Daisy", "Rocky", "Ruby", "Shadow", "Sophie"
     ];
     const grid = document.getElementById('avatar-grid');
+    if (!grid) return;
+
+    grid.innerHTML = ""; // Temizle
     seeds.forEach(seed => {
         const item = document.createElement('div');
         item.className = `avatar-item ${currentUser.avatarSeed === seed ? 'selected' : ''}`;
@@ -79,21 +95,13 @@ function init() {
         };
         grid.appendChild(item);
     });
-
-    // Otomatik giriş (Eğer isim varsa)
-    if (currentUser.name) {
-        inputs.username.value = currentUser.name;
-        joinApp();
-    }
-
-    setupSocket();
-    startTimerLoop();
 }
 
-// --- FUNCTIONS ---
+// --- CORE FUNCTIONS ---
 
 function joinApp() {
-    const name = inputs.username.value.trim();
+    const nameInput = document.getElementById('username-input');
+    const name = nameInput.value.trim();
     if (!name) {
         alert("Lütfen bir isim gir!");
         return;
@@ -106,19 +114,18 @@ function joinApp() {
     displays.localAvatar.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${currentUser.avatarSeed}`;
     
     switchScreen('study');
-    
     socket.emit('join', currentUser);
 }
 
 function switchScreen(screenName) {
-    Object.values(screens).forEach(s => s.classList.remove('active'));
-    screens[screenName].classList.add('active');
+    Object.values(screens).forEach(s => {
+        if (s) s.classList.remove('active');
+    });
+    if (screens[screenName]) screens[screenName].classList.add('active');
 }
 
 function toggleTimer() {
-    if (currentUser.status === 'break') {
-        toggleBreak();
-    }
+    if (currentUser.status === 'break') toggleBreak();
 
     currentUser.isActive = !currentUser.isActive;
     
@@ -138,7 +145,7 @@ function toggleTimer() {
         document.getElementById('local-user').classList.remove('working-pulsate');
     }
     
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     syncWithServer();
 }
 
@@ -164,7 +171,7 @@ function toggleBreak() {
     }
     
     updateStatusUI('local', currentUser.status);
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
     syncWithServer();
 }
 
@@ -185,72 +192,57 @@ function updateStatusUI(type, status) {
     }
 }
 
-function formatTime(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
-}
-
 function startTimerLoop() {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
-        // Yerel zaman
-        let displaySec = currentUser.totalSeconds;
+        // Local
+        let localSec = currentUser.totalSeconds;
         if (currentUser.isActive && currentUser.startTime) {
-            displaySec += Math.floor((Date.now() - currentUser.startTime) / 1000);
+            localSec += Math.floor((Date.now() - currentUser.startTime) / 1000);
         }
-        displays.localTimer.innerText = formatTime(displaySec);
+        displays.localTimer.innerText = formatTime(localSec);
 
-        // Uzak zaman
+        // Remote
         if (remoteUser) {
-            let remoteDisplaySec = remoteUser.totalSeconds;
+            let remoteSec = remoteUser.totalSeconds;
             if (remoteUser.isActive && remoteUser.startTime) {
-                remoteDisplaySec += Math.floor((Date.now() - remoteUser.startTime) / 1000);
+                remoteSec += Math.floor((Date.now() - remoteUser.startTime) / 1000);
             }
-            displays.remoteTimer.innerText = formatTime(remoteDisplaySec);
+            displays.remoteTimer.innerText = formatTime(remoteSec);
         }
     }, 1000);
 }
 
-// --- SOCKET MANTIĞI ---
+function formatTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return [h, m, s].map(v => v < 10 ? "0" + v : v).join(":");
+}
+
+// --- SOCKET LOGIC ---
 function setupSocket() {
-    socket.on('init-state', (data) => {
-        currentUser = { ...currentUser, ...data };
-        updateStatusUI('local', currentUser.status);
-        // UI butonlarını duruma göre güncelle
-        if (currentUser.status === 'break') {
-            buttons.breakToggle.innerHTML = '<i data-lucide="book-open"></i> Çalışmaya Dön';
-            buttons.timerToggle.disabled = true;
-        }
+    socket.on('connect', () => console.log("Sunucuya bağlandık!"));
+
+    socket.on('user-joined', (user) => {
+        if (!remoteUser || remoteUser.id === user.id) showRemoteUser(user);
     });
 
     socket.on('all-users', (users) => {
-        if (users.length > 0) {
-            showRemoteUser(users[0]);
-        }
-    });
-
-    socket.on('user-joined', (user) => {
-        if (!remoteUser || remoteUser.id === user.id) {
-            showRemoteUser(user);
-        }
+        if (users.length > 0) showRemoteUser(users[0]);
     });
 
     socket.on('state-changed', (user) => {
         if (remoteUser && remoteUser.id === user.id) {
             remoteUser = user;
             updateStatusUI('remote', user.status);
-            // Uzak kullanıcının avatarını ve ismini de güncel tut (eğer değişirse)
             displays.remoteName.innerText = user.name;
-            displays.remoteAvatar.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.avatarSeed || user.name}`;
+            displays.remoteAvatar.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.avatarSeed}`;
         }
     });
 
-    socket.on('user-left', (userId) => {
-        if (remoteUser && remoteUser.id === userId) {
-            hideRemoteUser();
-        }
+    socket.on('user-left', (id) => {
+        if (remoteUser && remoteUser.id === id) hideRemoteUser();
     });
 }
 
@@ -265,7 +257,7 @@ function showRemoteUser(data) {
     displays.remoteCard.querySelector('.user-content').classList.remove('hidden');
     
     displays.remoteName.innerText = data.name;
-    displays.remoteAvatar.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${data.avatarSeed || data.name}`;
+    displays.remoteAvatar.src = `https://api.dicebear.com/7.x/adventurer/svg?seed=${data.avatarSeed}`;
     updateStatusUI('remote', data.status);
 }
 
