@@ -14,11 +14,12 @@ model User {
   id          String   @id @default(uuid())
   name        String
   avatarSeed  String
-  status      String   @default("working") // working, break
+  status      String   @default("working")
   isActive    Boolean  @default(false)
   startTime   DateTime?
   totalSeconds Int     @default(0)
   lastSeen    DateTime @default(now())
+  roomId      String   @default("0000")
   messages    ChatMessage[]
   todos       Todo[]
 }
@@ -29,6 +30,7 @@ model Todo {
   completed Boolean  @default(false)
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  roomId    String   @default("0000")
   createdAt DateTime @default(now())
 }
 
@@ -37,5 +39,6 @@ model ChatMessage {
   text      String
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  roomId    String   @default("0000")
   createdAt DateTime @default(now())
 }

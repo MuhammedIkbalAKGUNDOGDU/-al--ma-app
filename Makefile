@@ -12,7 +12,7 @@ dev-frontend:
 	cd frontend && npm run dev
 
 docker-up:
-	docker-compose up -d --build
+	docker compose up -d --build
 
 docker-down:
-	docker-compose down
+	docker compose down

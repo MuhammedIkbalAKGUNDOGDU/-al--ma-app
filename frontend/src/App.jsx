@@ -7,26 +7,35 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || `http://${window.location.hostname}:3001`;
 
 function App() {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('study_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [todos, setTodos] = useState([]);
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null);
   const [isJoined, setIsJoined] = useState(false);
+  const [isAutoJoining, setIsAutoJoining] = useState(true);
   const [inputValue, setInputValue] = useState("");
+  const [roomInput, setRoomInput] = useState("");
   const [todoInput, setTodoInput] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [avatarSeed, setAvatarSeed] = useState("Mimi");
 
   const chatEndRef = useRef(null);
 
-  const avatars = ["Mimi", "Jasper", "Sheba", "Coco", "Luna", "Leo", "Buster", "Cleo", "Felix", "Willow"];
+  const avatars = [
+    "Mimi", "Jasper", "Sheba", "Coco", "Luna", "Leo", "Buster", "Cleo", "Felix", "Willow",
+    "Oliver", "Pepper", "Ziggy", "Sasha", "Toby", "Bella", "Cookie", "Nala", "Milo", "Daisy",
+    "Rocky", "Ruby", "Shadow", "Sophie", "Jack", "Zoe", "Buddy", "Lucky", "Princess", "Bear",
+    "Duke", "Charlie", "Max", "Lola", "Oscar", "Molly", "Heidi", "Sam", "Sassy", "Roscoe"
+  ];
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL);
@@ -38,41 +47,85 @@ function App() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('user-joined', (newUser) => {
+    const onUserJoined = (newUser) => {
       setRemoteUsers(prev => [...prev.filter(u => u.id !== newUser.id), newUser]);
-    });
+    };
 
-    socket.on('all-users', (users) => {
-      if (user) {
-        setRemoteUsers(users.filter(u => u.id !== user.id));
+    const onAllUsers = (users) => {
+      if (userRef.current) {
+        setRemoteUsers(users.filter(u => u.id !== userRef.current.id));
       } else {
         setRemoteUsers(users);
       }
-    });
+    };
 
-    socket.on('initial-data', ({ todos, messages }) => {
+    const onInitialData = ({ todos, messages }) => {
       setTodos(todos);
       setMessages(messages);
-    });
+    };
 
-    socket.on('state-changed', (updatedUser) => {
+    const onStateChanged = (updatedUser) => {
+      if (userRef.current && updatedUser.id === userRef.current.id) {
+        setUser(updatedUser);
+      }
       setRemoteUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    });
+    };
 
-    socket.on('user-left', (userId) => {
+    const onUserLeft = (userId) => {
       setRemoteUsers(prev => prev.filter(u => u.id !== userId));
-    });
+    };
 
-    socket.on('todo-added', (todo) => setTodos(prev => [...prev, todo]));
-    socket.on('todo-toggled', (updatedTodo) => {
+    const onTodoAdded = (todo) => setTodos(prev => [...prev, todo]);
+    const onTodoToggled = (updatedTodo) => {
       setTodos(prev => prev.map(t => t.id === updatedTodo.id ? updatedTodo : t));
-    });
-    socket.on('message-received', (msg) => {
+    };
+    const onMessageReceived = (msg) => {
       setMessages(prev => [...prev, msg]);
-      setTimeout(scrollToBottom, 100);
-    });
+      setTimeout(scrollToBottom, 50);
+      
+      // Notification sound
+      if (userRef.current && msg.userId !== userRef.current.id) {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play().catch(e => console.log('Audio play blocked:', e));
+      }
+    };
 
-  }, [socket, user]);
+    const onConnect = () => {
+      console.log("Connected to server");
+      if (userRef.current) {
+        socket.emit('join', userRef.current);
+        setIsJoined(true);
+      }
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('user-joined', onUserJoined);
+    socket.on('all-users', onAllUsers);
+    socket.on('initial-data', onInitialData);
+    socket.on('state-changed', onStateChanged);
+    socket.on('user-left', onUserLeft);
+    socket.on('todo-added', onTodoAdded);
+    socket.on('todo-toggled', onTodoToggled);
+    socket.on('message-received', onMessageReceived);
+
+    // Initial check
+    if (socket.connected && userRef.current && !isJoined) {
+        onConnect();
+    }
+    setIsAutoJoining(false);
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('user-joined', onUserJoined);
+      socket.off('all-users', onAllUsers);
+      socket.off('initial-data', onInitialData);
+      socket.off('state-changed', onStateChanged);
+      socket.off('user-left', onUserLeft);
+      socket.off('todo-added', onTodoAdded);
+      socket.off('todo-toggled', onTodoToggled);
+      socket.off('message-received', onMessageReceived);
+    };
+  }, [socket]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -80,19 +133,31 @@ function App() {
 
   const joinSession = () => {
     if (!inputValue.trim()) return;
+    const finalRoom = roomInput.trim().length === 4 ? roomInput.trim() : Math.floor(1000 + Math.random() * 9000).toString();
+    
     const userData = {
       id: user?.id || Math.random().toString(36).substr(2, 9),
       name: inputValue,
       avatarSeed: avatarSeed,
       status: 'working',
       isActive: false,
-      totalSeconds: 0
+      totalSeconds: 0,
+      roomId: finalRoom
     };
     setUser(userData);
     localStorage.setItem('study_user', JSON.stringify(userData));
     socket.emit('join', userData);
     setIsJoined(true);
   };
+
+  // Heartbeat to keep session alive
+  useEffect(() => {
+    if (!socket || !isJoined || !user) return;
+    const heartbeat = setInterval(() => {
+        socket.emit('update-state', user);
+    }, 30000);
+    return () => clearInterval(heartbeat);
+  }, [socket, isJoined, user]);
 
   const toggleTimer = () => {
     const updatedUser = { ...user, isActive: !user.isActive };
@@ -160,6 +225,14 @@ function App() {
     return () => clearInterval(interval);
   }, [user]);
 
+  if (isAutoJoining) {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <div className="text-primary animate-pulse text-xl font-bold">Yükleniyor...</div>
+        </div>
+    );
+  }
+
   if (!isJoined) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -173,22 +246,39 @@ function App() {
             <p className="text-text/70">Birlikte çalışmak daha eğlenceli!</p>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">İsminiz</label>
-              <input 
-                type="text" 
-                className="input-field w-full"
-                placeholder="Örn: Muhammed"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && joinSession()}
-              />
+          <div className="space-y-4">
+            <div className="flex gap-4">
+                <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">İsminiz</label>
+                    <input 
+                        type="text" 
+                        className="input-field w-full"
+                        placeholder="Örn: Muhammed"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && joinSession()}
+                    />
+                </div>
+                <div className="w-24">
+                    <label className="block text-sm font-medium mb-2">Oda ID</label>
+                    <input 
+                        type="text" 
+                        maxLength={4}
+                        className="input-field w-full text-center font-bold"
+                        placeholder="1234"
+                        value={roomInput}
+                        onChange={(e) => setRoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    />
+                </div>
+            </div>
+
+            <div className="text-xs text-text/50 italic mb-2">
+                *Oda ID girmezseniz rastgele bir oda oluşturulur.
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Avatar Seçin</label>
-              <div className="grid grid-cols-5 gap-3">
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 max-h-[160px] overflow-y-auto sweet-scrollbar p-2 bg-white/30 rounded-2xl">
                 {avatars.map(seed => (
                   <button 
                     key={seed}
@@ -201,8 +291,8 @@ function App() {
               </div>
             </div>
 
-            <button onClick={joinSession} className="btn-primary w-full mt-4">
-              Hadi Başlayalım!
+            <button onClick={joinSession} className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
+              Başla <Send size={20} />
             </button>
           </div>
         </motion.div>
@@ -213,12 +303,15 @@ function App() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <header className="flex justify-between items-center mb-8">
+      <header className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
         <div className="flex items-center gap-3">
-            <div className="bg-primary p-2 rounded-xl text-white">
+            <div className="bg-primary p-2 rounded-xl text-white shadow-lg">
                 <BookOpen size={24} />
             </div>
-            <h1 className="text-2xl font-bold text-primary">StudyBuddies</h1>
+            <div>
+                <h1 className="text-2xl font-bold text-primary leading-none">StudyBuddies</h1>
+                <p className="text-xs font-semibold text-text/40 tracking-wider">ODA: #{user?.roomId}</p>
+            </div>
         </div>
         <button 
           onClick={() => { localStorage.removeItem('study_user'); window.location.reload(); }}
@@ -364,8 +457,8 @@ function UserCard({ user, isLocal, toggleTimer, toggleBreak }) {
     return (
         <div className={`glass-card p-6 flex flex-col items-center relative overflow-hidden transition-all ${user.isActive ? 'ring-2 ring-primary ring-offset-4 working-pulsate' : ''}`}>
             {user.status === 'break' && (
-                <div className="absolute inset-0 bg-secondary/10 flex items-center justify-center backdrop-blur-[2px]">
-                    <div className="bg-secondary text-text font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                <div className="absolute inset-0 bg-secondary/10 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">
+                    <div className="bg-secondary text-text font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2 pointer-events-auto">
                         <Coffee size={18} /> Molada
                     </div>
                 </div>

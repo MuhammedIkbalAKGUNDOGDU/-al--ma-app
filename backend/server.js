@@ -25,42 +25,45 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join', async (userData) => {
-    const { id, name, avatarSeed } = userData;
-    
-    // Upsert user in DB
+    const { id, name, avatarSeed, roomId } = userData;
+    const room = roomId || "0000";
+    console.log(`[JOIN] User:${name} ID:${id} Room:${room} Socket:${socket.id}`);
+
     try {
       const user = await prisma.user.upsert({
         where: { id: id },
-        update: { lastSeen: new Date() },
+        update: { 
+            name: name,
+            avatarSeed: avatarSeed,
+            roomId: room,
+            lastSeen: new Date() 
+        },
         create: {
           id: id,
           name: name,
           avatarSeed: avatarSeed,
+          roomId: room
         }
       });
 
-      users[socket.id] = id;
+      users[socket.id] = { id, roomId: room };
       
-      // Join room
-      socket.join('study-room');
+      socket.join(room);
+      socket.to(room).emit('user-joined', user);
       
-      // Broadcast user joined
-      socket.to('study-room').emit('user-joined', user);
-      
-      // Send current users to new user
       const dbUsers = await prisma.user.findMany({
         where: {
-          lastSeen: {
-            gt: new Date(Date.now() - 1000 * 60 * 5) // Last 5 mins
-          }
+          roomId: room,
+          lastSeen: { gt: new Date(Date.now() - 1000 * 60 * 60) }
         }
       });
+      console.log(`[ROOM STATE] Room:${room} ActiveUsers:${dbUsers.length}`);
       socket.emit('all-users', dbUsers);
       
-      // Send initial todos and messages
-      const todos = await prisma.todo.findMany();
+      const todos = await prisma.todo.findMany({ where: { roomId: room } });
       const messages = await prisma.chatMessage.findMany({
-          take: 50,
+          where: { roomId: room },
+          take: 100,
           orderBy: { createdAt: 'asc' },
           include: { user: true }
       });
@@ -71,37 +74,44 @@ io.on('connection', (socket) => {
   });
 
   socket.on('update-state', async (data) => {
-    const userId = users[socket.id];
-    if (!userId) return;
+    const session = users[socket.id];
+    if (!session) return;
+    // console.log(`[UPDATE] UserID:${session.id} Status:${data.status}`);
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        status: data.status,
-        isActive: data.isActive,
-        startTime: data.startTime ? new Date(data.startTime) : null,
-        totalSeconds: data.totalSeconds,
-        lastSeen: new Date()
-      }
-    });
-
-    socket.to('study-room').emit('state-changed', updatedUser);
+    try {
+        const updatedUser = await prisma.user.update({
+          where: { id: session.id },
+          data: {
+            status: data.status,
+            isActive: data.isActive,
+            startTime: data.startTime ? new Date(data.startTime) : null,
+            totalSeconds: data.totalSeconds,
+            lastSeen: new Date()
+          }
+        });
+        socket.to(session.roomId).emit('state-changed', updatedUser);
+    } catch(e) {}
   });
 
   socket.on('add-todo', async (text) => {
-    const userId = users[socket.id];
-    if (!userId) return;
+    const session = users[socket.id];
+    if (!session) return;
+    console.log(`[TODO] Room:${session.roomId} Text:${text}`);
 
     const todo = await prisma.todo.create({
       data: {
         text,
-        userId
+        userId: session.id,
+        roomId: session.roomId
       }
     });
-    io.to('study-room').emit('todo-added', todo);
+    io.to(session.roomId).emit('todo-added', todo);
   });
 
   socket.on('toggle-todo', async (todoId) => {
+    const session = users[socket.id];
+    if (!session) return;
+
     const todo = await prisma.todo.findUnique({ where: { id: todoId } });
     if (!todo) return;
 
@@ -109,31 +119,33 @@ io.on('connection', (socket) => {
       where: { id: todoId },
       data: { completed: !todo.completed }
     });
-    io.to('study-room').emit('todo-toggled', updatedTodo);
+    io.to(session.roomId).emit('todo-toggled', updatedTodo);
   });
 
   socket.on('send-message', async (text) => {
-    const userId = users[socket.id];
-    if (!userId) return;
+    const session = users[socket.id];
+    if (!session) return;
+    console.log(`[CHAT] Room:${session.roomId} Text:${text}`);
 
     const message = await prisma.chatMessage.create({
       data: {
         text,
-        userId
+        userId: session.id,
+        roomId: session.roomId
       },
       include: { user: true }
     });
-    io.to('study-room').emit('message-received', message);
+    io.to(session.roomId).emit('message-received', message);
   });
 
   socket.on('disconnect', async () => {
-    const userId = users[socket.id];
-    if (userId) {
+    const session = users[socket.id];
+    if (session) {
       await prisma.user.update({
-        where: { id: userId },
+        where: { id: session.id },
         data: { isActive: false, lastSeen: new Date() }
       });
-      socket.to('study-room').emit('user-left', userId);
+      socket.to(session.roomId).emit('user-left', session.id);
       delete users[socket.id];
     }
   });
